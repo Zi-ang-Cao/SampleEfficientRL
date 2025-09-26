@@ -1,10 +1,28 @@
 #!/usr/bin/env python3
 
+import jax
+# TODO: remove this when orbax-checkpoint is upgraded
+# this is a temporary fix for a version incompatibility with jax
+try:
+    # check if record_scalar exists
+    jax.monitoring.record_scalar
+except AttributeError:
+    # if not, create a dummy one
+    def no_op(*args, **kwargs):
+        """A dummy function that does nothing."""
+        pass
+
+    if not hasattr(jax, "monitoring"):
+        from types import SimpleNamespace
+
+        jax.monitoring = SimpleNamespace()
+    jax.monitoring.record_scalar = no_op
+
+
 import time
 from functools import partial
 
 import gym
-import jax
 import jax.numpy as jnp
 import numpy as np
 import tqdm
@@ -228,7 +246,7 @@ def learner(rng, agent: SACAgent, replay_buffer, replay_iterator):
             batch = next(replay_iterator)
 
         with timer.context("train"):
-            agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.utd_ratio)
+            agent, update_info = agent.update_high_utd(batch, utd_ratio=FLAGS.critic_actor_ratio)
             agent = jax.block_until_ready(agent)
 
             # publish the updated network
